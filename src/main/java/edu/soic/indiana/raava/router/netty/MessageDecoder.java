@@ -34,26 +34,6 @@ public class MessageDecoder extends FrameDecoder {
                 buf.resetReaderIndex();
                 return null;
             }
-            long timeStamp = buf.readLong();
-            int clientPort = buf.readInt();
-            available -= 12;
-            if (ctrl_msg == ControlMessage.EOB_MESSAGE) {
-
-                long interval = System.currentTimeMillis() - timeStamp;
-                if (interval > 0) {
-
-                    Histogram netTransTime =
-                            getTransmitHistogram(channel, clientPort);
-                    if (netTransTime != null) {
-                        netTransTime.update(interval );
-
-                    }
-                }
-
-                recvSpeed.update(Double.valueOf(ControlMessage
-                        .encodeLength()));
-            }
-
             return ctrl_msg;
         }
 
@@ -70,12 +50,13 @@ public class MessageDecoder extends FrameDecoder {
         int length = buf.readInt();
         if (length <= 0) {
             throw new Exception("Receive one message whose TaskMessage's message length is " + length);
-            return new RouterMessage(code, null);
         }
+
         int headerLength = buf.readInt();
         if (headerLength <= 0) {
             throw new Exception("Receive one message whose TaskMessage's message header length is " + length);
         }
+
         // Make sure if there's enough bytes in the buffer.
         available -= 8;
         if (available < length + headerLength) {
@@ -101,7 +82,6 @@ public class MessageDecoder extends FrameDecoder {
         // Successfully decoded a frame.
         // Return a TaskMessage object
         byte[] rawBytes = payload.array();
-        RouterMessage ret = new RouterMessage(code, rawBytes, sourceTask, stream);
-        return ret;
+        return new RouterMessage(code, rawBytes, sourceTask, stream);
     }
 }

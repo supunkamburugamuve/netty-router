@@ -22,4 +22,11 @@ public class Utils {
             throw new IllegalArgumentException("Don't know how to convert " + o + " to int");
         }
     }
+
+    public static void sleepMs(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ignore) {
+        }
+    }
 }
