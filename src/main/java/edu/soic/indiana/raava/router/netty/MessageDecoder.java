@@ -17,106 +17,91 @@ public class MessageDecoder extends FrameDecoder {
             return null;
         }
 
-        try {
-            // Mark the current buffer position before reading task/len field
-            // because the whole frame might not be in the buffer yet.
-            // We will reset the buffer position to the marked position if
-            // there's not enough bytes in the buffer.
-            buf.markReaderIndex();
+        // Mark the current buffer position before reading task/len field
+        // because the whole frame might not be in the buffer yet.
+        // We will reset the buffer position to the marked position if
+        // there's not enough bytes in the buffer.
+        buf.markReaderIndex();
+        // read the short field
+        short code = buf.readShort();
+        available -= 2;
 
-            // read the short field
-            short code = buf.readShort();
-            available -= 2;
+        // case 1: Control message
+        ControlMessage ctrl_msg = ControlMessage.mkMessage(code);
+        if (ctrl_msg != null) {
+            if (available < 12) {
+                // The time stamp bytes were not received yet - return null.
+                buf.resetReaderIndex();
+                return null;
+            }
+            long timeStamp = buf.readLong();
+            int clientPort = buf.readInt();
+            available -= 12;
+            if (ctrl_msg == ControlMessage.EOB_MESSAGE) {
 
-            // case 1: Control message
-            ControlMessage ctrl_msg = ControlMessage.mkMessage(code);
-            if (ctrl_msg != null) {
-                if (available < 12) {
-                    // The time stamp bytes were not received yet - return null.
-                    buf.resetReaderIndex();
-                    return null;
-                }
-                long timeStamp = buf.readLong();
-                int clientPort = buf.readInt();
-                available -= 12;
-                if (ctrl_msg == ControlMessage.EOB_MESSAGE) {
+                long interval = System.currentTimeMillis() - timeStamp;
+                if (interval > 0) {
 
-                    long interval = System.currentTimeMillis() - timeStamp;
-                    if (interval > 0) {
+                    Histogram netTransTime =
+                            getTransmitHistogram(channel, clientPort);
+                    if (netTransTime != null) {
+                        netTransTime.update(interval );
 
-                        Histogram netTransTime =
-                                getTransmitHistogram(channel, clientPort);
-                        if (netTransTime != null) {
-                            netTransTime.update(interval );
-
-                        }
                     }
-
-                    recvSpeed.update(Double.valueOf(ControlMessage
-                            .encodeLength()));
                 }
 
-                return ctrl_msg;
+                recvSpeed.update(Double.valueOf(ControlMessage
+                        .encodeLength()));
             }
 
-            // case 2: task Message
-            short task = code;
-
-            // Make sure that we have received at least an integer (length)
-            if (available < 8) {
-                // need more data
-                buf.resetReaderIndex();
-
-                return null;
-            }
-
-            // Read the length field.
-            int length = buf.readInt();
-            if (length <= 0) {
-                LOG.info(
-                        "Receive one message whose TaskMessage's message length is {}",
-                        length);
-                return new TaskMessage(task, null);
-            }
-            int headerLength = buf.readInt();
-            if (headerLength <= 0) {
-                LOG.info("Receive one message whose TaskMessage's message header length is {}",
-                        length);
-            }
-            // Make sure if there's enough bytes in the buffer.
-            available -= 8;
-            if (available < length + headerLength) {
-                // The whole bytes were not received yet - return null.
-                buf.resetReaderIndex();
-
-                return null;
-            }
-
-            int sourceTask = -1;
-            String stream = null;
-            if (headerLength > 0) {
-                ChannelBuffer header = buf.readBytes(headerLength);
-                String headerValue = new String(header.array());
-                String splits[] = headerValue.split(" ");
-                stream = splits[0];
-                sourceTask = Integer.parseInt(splits[1]);
-            }
-
-            // There's enough bytes in the buffer. Read it.
-            ChannelBuffer payload = buf.readBytes(length);
-
-            // Successfully decoded a frame.
-            // Return a TaskMessage object
-            byte[] rawBytes = payload.array();
-            TaskMessage ret = new TaskMessage(task, rawBytes, sourceTask, stream);
-            recvSpeed.update(Double.valueOf(rawBytes.length + 6));
-            return ret;
-        } finally {
-            if (isServer) {
-                Long endTime = System.nanoTime();
-                timer.update((endTime - startTime) / 1000000.0d);
-            }
+            return ctrl_msg;
         }
 
+        // case 2: task Message
+        // Make sure that we have received at least an integer (length)
+        if (available < 8) {
+            // need more data
+            buf.resetReaderIndex();
+
+            return null;
+        }
+
+        // Read the length field.
+        int length = buf.readInt();
+        if (length <= 0) {
+            throw new Exception("Receive one message whose TaskMessage's message length is " + length);
+            return new RouterMessage(code, null);
+        }
+        int headerLength = buf.readInt();
+        if (headerLength <= 0) {
+            throw new Exception("Receive one message whose TaskMessage's message header length is " + length);
+        }
+        // Make sure if there's enough bytes in the buffer.
+        available -= 8;
+        if (available < length + headerLength) {
+            // The whole bytes were not received yet - return null.
+            buf.resetReaderIndex();
+
+            return null;
+        }
+
+        int sourceTask = -1;
+        String stream = null;
+        if (headerLength > 0) {
+            ChannelBuffer header = buf.readBytes(headerLength);
+            String headerValue = new String(header.array());
+            String splits[] = headerValue.split(" ");
+            stream = splits[0];
+            sourceTask = Integer.parseInt(splits[1]);
+        }
+
+        // There's enough bytes in the buffer. Read it.
+        ChannelBuffer payload = buf.readBytes(length);
+
+        // Successfully decoded a frame.
+        // Return a TaskMessage object
+        byte[] rawBytes = payload.array();
+        RouterMessage ret = new RouterMessage(code, rawBytes, sourceTask, stream);
+        return ret;
     }
 }
