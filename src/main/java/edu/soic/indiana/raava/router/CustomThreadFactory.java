@@ -1,4 +1,4 @@
-package edu.soic.indiana.raava.router.netty;
+package edu.soic.indiana.raava.router;
 
 import org.jboss.netty.util.ThreadNameDeterminer;
 import org.jboss.netty.util.ThreadRenamingRunnable;
@@ -6,17 +6,20 @@ import org.jboss.netty.util.ThreadRenamingRunnable;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class NettyThreadFactory implements ThreadFactory {
+/**
+ * This class is used to rename the server threads
+ */
+public class CustomThreadFactory implements ThreadFactory {
     static {
         // Rename Netty threads
         ThreadRenamingRunnable.setThreadNameDeterminer(ThreadNameDeterminer.CURRENT);
     }
 
-    final ThreadGroup group;
-    final AtomicInteger index = new AtomicInteger(1);
-    final String name;
+    private final ThreadGroup group;
+    private final AtomicInteger index = new AtomicInteger(1);
+    private final String name;
 
-    NettyThreadFactory(String name) {
+    public CustomThreadFactory(String name) {
         SecurityManager s = System.getSecurityManager();
         group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
         this.name = name;

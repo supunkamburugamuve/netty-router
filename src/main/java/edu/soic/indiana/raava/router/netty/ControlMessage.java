@@ -7,7 +7,6 @@ import org.jboss.netty.buffer.ChannelBuffers;
 public enum ControlMessage {
     EOB_MESSAGE((short) -201), OK_RESPONSE((short) -200);
 
-
     private short code;
     private long timeStamp;
     protected static int port;

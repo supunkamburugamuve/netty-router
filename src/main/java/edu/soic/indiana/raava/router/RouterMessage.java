@@ -1,4 +1,4 @@
-package edu.soic.indiana.raava.router.netty;
+package edu.soic.indiana.raava.router;
 
 import java.nio.ByteBuffer;
 

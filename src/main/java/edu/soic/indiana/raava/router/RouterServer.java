@@ -1,7 +1,8 @@
-package edu.soic.indiana.raava.router.netty;
+package edu.soic.indiana.raava.router;
 
-import edu.soic.indiana.raava.router.CustomThreadFactory;
-import edu.soic.indiana.raava.router.RouterServerHandler;
+import edu.soic.indiana.raava.router.netty.MessageDecoder;
+import edu.soic.indiana.raava.router.netty.MessageEncoder;
+import edu.soic.indiana.raava.router.netty.Utils;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.*;
 import org.jboss.netty.channel.group.ChannelGroup;
@@ -13,20 +14,15 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
-public class NettyServer {
+public class RouterServer {
     public static final String ROUTER_BUFFER_SIZE = "router.buffer.size";
     public static final String ROUTER_WORKER_THREADS = "router.worker.threads";
 
-    final Map conf;
-    final int port;
-    volatile ChannelGroup allChannels = new DefaultChannelGroup("raava-router");
-    final ChannelFactory factory;
-    final ServerBootstrap bootstrap;
+    private volatile ChannelGroup allChannels = new DefaultChannelGroup("raava-router");
+    private final ChannelFactory factory;
+    private final ServerBootstrap bootstrap;
 
-    NettyServer(Map conf, int port, boolean isSyncMode) {
-        this.conf = conf;
-        this.port = port;
-
+    public RouterServer(Map conf, int port, RouterServerHandler serverHandler) {
         int buffer_size = Utils.getInt(conf.get(ROUTER_BUFFER_SIZE));
         int maxWorkers = Utils.getInt(conf.get(ROUTER_WORKER_THREADS));
 
@@ -45,37 +41,29 @@ public class NettyServer {
         bootstrap.setOption("child.keepAlive", true);
 
         // Set up the pipeline factory.
-        bootstrap.setPipelineFactory(new StormServerPipelineFactory(this, conf));
+        bootstrap.setPipelineFactory(new StormServerPipelineFactory(conf, serverHandler));
 
         // Bind and start to accept incoming connections.
         Channel channel = bootstrap.bind(new InetSocketAddress(port));
         allChannels.add(channel);
     }
 
-    class StormServerPipelineFactory implements ChannelPipelineFactory {
-        private NettyServer server;
+    private class StormServerPipelineFactory implements ChannelPipelineFactory {
+        private RouterServerHandler serverHandler;
         private Map conf;
 
-        StormServerPipelineFactory(NettyServer server, Map conf) {
-            this.server = server;
+        StormServerPipelineFactory(Map conf, RouterServerHandler serverHandler) {
             this.conf = conf;
+            this.serverHandler = serverHandler;
         }
 
         public ChannelPipeline getPipeline() throws Exception {
             // Create a default pipeline implementation.
             ChannelPipeline pipeline = Channels.pipeline();
-
-            // Decoder
             pipeline.addLast("decoder", new MessageDecoder(true, conf));
-            // Encoder
             pipeline.addLast("encoder", new MessageEncoder());
-            // business logic.
-            pipeline.addLast("handler", new RouterServerHandler(server));
-
+            pipeline.addLast("handler", serverHandler);
             return pipeline;
         }
     }
-
-
-
 }

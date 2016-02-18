@@ -1,5 +1,7 @@
 package edu.soic.indiana.raava.router.netty;
 
+import edu.soic.indiana.raava.router.RouterClientHandler;
+import edu.soic.indiana.raava.router.RouterMessage;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.*;
 import org.slf4j.Logger;
